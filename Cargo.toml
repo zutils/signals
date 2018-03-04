@@ -1,0 +1,13 @@
+[package]
+name = "signals"
+version = "0.0.1"
+authors = ["James Prince <34577138+zutils@users.noreply.github.com>"]
+repository = "https://github.com/zutils/signals"
+keywords = ["signals", "frp", "emitter"]
+categories = ["asynchronous", "game-engines", "rust-patterns", "template-engine", "concurrency"]
+description = "A functional-reactive-like library for Rust that allows asynchronous chaining"
+readme = "./README.md"
+license = "MIT/Apache-2.0"
+
+[dependencies]
+failure = "0.1.1"
