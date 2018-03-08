@@ -1,4 +1,4 @@
-//! The Signals crate is a functional-reactive-like system that will help organize your code. 
+//! The Signals crate is an asynchronous functional-reactive-like api.
 //!
 //! # Installation
 //!
@@ -13,7 +13,25 @@
 //! extern crate signals; 
 //! ```
 //!
-//! # Examples
+//! # Simple Example
+//!
+//! ```should_panic
+//! use signals::{Signal, Emitter};
+//!
+//! fn main() {
+//!     // create a signal that will assert when emitted
+//!     let signal = Signal::new( |x: &u32| Ok(*x) );
+//!     let listener = Signal::new( |x: &u32| { assert_ne!(*x, 5); Ok(()) } ); //fail!
+//!     
+//!     // when signal is emitted, listener should execute.
+//!     signal.lock().unwrap().register_listener(&listener);
+//!
+//!     // emit signal
+//!     signal.lock().unwrap().emit(5);
+//! }
+//! ```
+//!
+//! # Complex Example
 //!
 //! ```should_panic
 //! use signals::{Signal, Emitter};
