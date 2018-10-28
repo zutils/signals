@@ -5,7 +5,7 @@
 //! Add this to cargo.toml
 //! ```text
 //! [dependencies]
-//! signals = "0.0.1"
+//! signals = "*"
 //! ```
 //!
 //! Add this to your crate
