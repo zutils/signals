@@ -62,7 +62,7 @@ use failure::Error;
 
 //standard imports
 use std::marker::PhantomData;
-use std::sync::{Arc, Weak, Mutex};
+use std::sync::{Arc, Weak, Mutex, MutexGuard};
 use std::thread;
 
 /// This is a polymorphic trait allowing multiple generic signals to be stored in a list.
@@ -74,10 +74,26 @@ pub trait Emitter: Send {
 }
 
 // because Arc<Mutex<T>> is sloppy
-pub type Am<T> = Arc<Mutex<T>>;
+#[derive(Clone)]
+pub struct Am<T: Sized>(Arc<Mutex<T>>);
+
 pub type Wm<T> = Weak<Mutex<T>>;
 pub type AmEmitter<T> = Am<Emitter<input=T>>;
 type WmEmitter<T> = Wm<Emitter<input=T>>;
+
+impl<T: Sized> Am<T> {
+    pub fn new(data: T) -> Self {
+        Am(Arc::new(Mutex::new(data)))
+    }
+
+    pub fn lock(&self) -> MutexGuard<'_, T> {
+        self.0.lock().unwrap()
+    }
+
+    pub fn clone(&self) -> Self {
+        Am(self.0.clone())
+    }
+}
 
 /// When creating a Signal, This trait represents the closure Fn allowed.
 pub trait SigFn<I, O>: Fn(I) -> Result<O, Error> {}
@@ -141,7 +157,7 @@ impl<I,O,F> Signal<I,O,F>
 
     /// Create a thread-safe parent signal. Note that the return function is Arc<Mutex<Signal<>>>
     pub fn new_arc_mutex(f: F) -> Am<Signal<I, O, impl SigFn<I, O>>> {
-        Arc::new(Mutex::new(Signal::new_signal(f)))
+        Am::new(Signal::new_signal(f))
     }
 
     /// Upgrade all weak emitters, and call emit(...)
@@ -172,7 +188,7 @@ impl<I,O,F> Signal<I,O,F>
     }
 
     /// This method is a helper for Signal::new(f) and register_listener(...)
-    pub fn create_listener<Q, G>(&mut self, f: G) -> AmEmitter<O>
+    pub fn create_listener<Q, G>(&mut self, f: G) -> Am<Signal<O, Q, impl SigFn<O,Q>>>
         where G: 'static + SigFn<O,Q> + Send + Sync,
               Q: 'static + PartialEq + Send + Sync + Clone,
               O: 'static
@@ -183,7 +199,7 @@ impl<I,O,F> Signal<I,O,F>
     }
     
     /// This method is a helper for Signal::new(f) and register_threaded_listener(...)
-    pub fn create_threaded_listener<Q, G>(&mut self, f: G) -> Arc<Mutex<Signal<O, Q, impl SigFn<O,Q>>>> 
+    pub fn create_threaded_listener<Q, G>(&mut self, f: G) -> Am<Signal<O, Q, impl SigFn<O,Q>>>
         where G: 'static + SigFn<O,Q> + Send + Sync,
               Q: 'static + PartialEq + Send + Sync + Clone,
               O: 'static
@@ -197,7 +213,7 @@ impl<I,O,F> Signal<I,O,F>
     pub fn register_listener<E>(&mut self, strong: &Am<E>) 
         where E: 'static + Emitter<input=O>
     {
-        let weak = Arc::downgrade(&strong);
+        let weak = Arc::downgrade(&strong.0);
         self.listeners.push(weak);
     }
     
@@ -206,7 +222,7 @@ impl<I,O,F> Signal<I,O,F>
     pub fn register_threaded_listener<E>(&mut self, strong: &Am<E>) 
         where E: 'static + Emitter<input=O>
     {
-        let weak = Arc::downgrade(&strong);
+        let weak = Arc::downgrade(&strong.0);
         self.threaded_listeners.push(weak);
     }
 
