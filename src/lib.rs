@@ -218,7 +218,6 @@ impl<I,O,F> Signal<I,O,F>
     }
     
     /// Register a child listener that will run on its own thread.
-    //pub fn register_threaded_listener(&mut self, strong: &AmEmitter<O>) {
     pub fn register_threaded_listener<E>(&mut self, strong: &Am<E>) 
         where E: 'static + Emitter<input=O>
     {
