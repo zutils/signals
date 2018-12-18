@@ -24,10 +24,10 @@
 //!     let listener = Signal::new_arc_mutex( |x: u32| { assert_ne!(x, 5); Ok(()) } ); //fail!
 //!     
 //!     // when signal is emitted, listener should execute.
-//!     signal.lock().unwrap().register_listener(&listener);
+//!     signal.lock().register_listener(&listener);
 //!
 //!     // emit signal
-//!     signal.lock().unwrap().emit(5);
+//!     signal.lock().emit(5);
 //! }
 //! ```
 //!
@@ -46,12 +46,12 @@
 //!     let fail = Signal::new_arc_mutex( |x: i32| { assert_ne!(x, 8); Ok(()) } ); //fail!
 //!     
 //!     //connect all signals together.
-//!     root.lock().unwrap().register_listener(&peek); // snoop on the value! - because we can!
-//!     root.lock().unwrap().register_listener(&to_i32); // parse the string to an integer
-//!     to_i32.lock().unwrap().register_listener(&inc); //increment the value
-//!     inc.lock().unwrap().register_listener(&fail); //then finally fail if the value is 8!
+//!     root.lock().register_listener(&peek); // snoop on the value! - because we can!
+//!     root.lock().register_listener(&to_i32); // parse the string to an integer
+//!     to_i32.lock().register_listener(&inc); //increment the value
+//!     inc.lock().register_listener(&fail); //then finally fail if the value is 8!
 //!     
-//!     root.lock().unwrap().emit(7); //7 will increment to 8 and fail!
+//!     root.lock().emit(7); //7 will increment to 8 and fail!
 //! }
 //! ```
 
