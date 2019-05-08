@@ -75,7 +75,7 @@ pub trait Emitter: Send {
 
 // because Arc<Mutex<T>> is sloppy
 #[derive(Clone)]
-pub struct Am<T: Sized>(Arc<Mutex<T>>);
+pub struct Am<T: ?Sized>(Arc<Mutex<T>>);
 
 pub type Wm<T> = Weak<Mutex<T>>;
 pub type AmEmitter<T> = Am<Emitter<input=T>>;
@@ -95,13 +95,8 @@ impl<T: Sized> Am<T> {
     }
 }
 
-/// When creating a Signal, This trait represents the closure Fn allowed.
-pub trait SigFn<I, O>: Fn(I) -> Result<O, Error> {}
-impl<F, I, O> SigFn<I, O> for F where F: Fn(I) -> Result<O, Error> {}
-
-impl<I,O,F> Emitter for Signal<I,O,F> 
-    where F: 'static + SigFn<I, O> + Send + Sync,
-          O: 'static + PartialEq + Send + Sync + Clone,
+impl<I,O> Emitter for Signal<I,O> 
+    where O: 'static + PartialEq + Send + Sync + Clone,
           I: 'static + Send + Sync
 {
     type input = I;
@@ -129,34 +124,37 @@ impl<I,O,F> Emitter for Signal<I,O,F>
 }
 
 /// Signals are the bread and butter of the crate.  A signal can trigger other signals whose input is the same output as the original signal. Signals support both threaded and non-threaded children.
-pub struct Signal<I, O, F> 
-    where F: SigFn<I, O> 
+pub struct Signal<I, O> 
+    //where F: 'static + SigFn<I, O> + Send + Sync,
 {
     input: PhantomData<I>,
     output: Option<O>,
-    func: F,
+    func: Box<FnMut(I) -> Result<O, Error> + Send + Sync>,
 
     listeners: Vec< WmEmitter<O> >,
     threaded_listeners: Vec< WmEmitter<O> >,
 }
 
-impl<I,O,F> Signal<I,O,F> 
-    where F: 'static + SigFn<I, O> + Send + Sync,
-          O: 'static + Send + Sync + Clone,
+impl<I,O> Signal<I,O> 
+    where O: 'static + Send + Sync + Clone,
           I: 'static + Send + Sync,
 {
-    fn new_signal(f: F) -> Signal<I, O, impl SigFn<I, O>> {
+    fn new_signal<F>(f: F) -> Signal<I, O> 
+        where F: 'static + FnMut(I) -> Result<O, Error> + Send + Sync,
+    {
         Signal {
             input: PhantomData,
             output: None,
-            func: move |i: _| f(i),
+            func: Box::new(f),
             listeners: Vec::new(),
             threaded_listeners: Vec::new(),
         }
     }
 
     /// Create a thread-safe parent signal. Note that the return function is Arc<Mutex<Signal<>>>
-    pub fn new_arc_mutex(f: F) -> Am<Signal<I, O, impl SigFn<I, O>>> {
+    pub fn new_arc_mutex<F>(f: F) -> Am<Signal<I, O>> 
+        where F: 'static + FnMut(I) -> Result<O, Error> + Send + Sync,
+    {
         Am::new(Signal::new_signal(f))
     }
 
@@ -188,8 +186,8 @@ impl<I,O,F> Signal<I,O,F>
     }
 
     /// This method is a helper for Signal::new(f) and register_listener(...)
-    pub fn create_listener<Q, G>(&mut self, f: G) -> Am<Signal<O, Q, impl SigFn<O,Q>>>
-        where G: 'static + SigFn<O,Q> + Send + Sync,
+    pub fn create_listener<Q, G, F>(&mut self, f: F) -> Am<Signal<O, Q>>
+        where F: 'static + FnMut(O) -> Result<Q, Error> + Send + Sync,
               Q: 'static + PartialEq + Send + Sync + Clone,
               O: 'static
     {
@@ -199,8 +197,8 @@ impl<I,O,F> Signal<I,O,F>
     }
     
     /// This method is a helper for Signal::new(f) and register_threaded_listener(...)
-    pub fn create_threaded_listener<Q, G>(&mut self, f: G) -> Am<Signal<O, Q, impl SigFn<O,Q>>>
-        where G: 'static + SigFn<O,Q> + Send + Sync,
+    pub fn create_threaded_listener<Q, G, F>(&mut self, f: F) -> Am<Signal<O, Q>>
+        where F: 'static + FnMut(O) -> Result<Q, Error> + Send + Sync,
               Q: 'static + PartialEq + Send + Sync + Clone,
               O: 'static
     {
